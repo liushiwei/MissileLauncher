@@ -16,6 +16,10 @@
 
 package com.android.missilelauncher;
 
+import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Iterator;
+
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
@@ -34,14 +38,13 @@ import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
 import android.hardware.usb.UsbRequest;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
-
-import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.Iterator;
 
 public class MissileLauncherActivity extends Activity
         implements View.OnClickListener, Runnable {
@@ -103,6 +106,7 @@ public class MissileLauncherActivity extends Activity
                 UsbManager.ACTION_USB_DEVICE_ATTACHED));
         registerReceiver(mUsbDeviceReceiver, new IntentFilter(
                 UsbManager.ACTION_USB_DEVICE_DETACHED));
+        mTextView_ShowConsole = (TextView) findViewById(R.id.ShowConsole);
     }
     
     private final BroadcastReceiver mUsbDeviceReceiver = new BroadcastReceiver() {
@@ -349,22 +353,36 @@ public class MissileLauncherActivity extends Activity
             }
         }
     }
-
+   private HidBridge hidBridge; 
+   public StringBuffer mStringBuffer_Console_Text = new StringBuffer("Show Info:\n");
+   public TextView mTextView_ShowConsole;
     public void onClick(View v) {
         if (v == mFire) {
-            sendCommand(COMMAND_FIRE);
+            //sendCommand(COMMAND_FIRE);
+            if(hidBridge==null){
+                hidBridge = new HidBridge(this,22336, 1155);
+                hidBridge.OpenDevice();
+            }
         }
         byte[] sendOut = "Hello World!!!".getBytes();
         if(v == mShoot) {
-            if(mConnection!=null) {
-                int ret = mConnection.bulkTransfer(endpointOut, sendOut, sendOut.length, 1000);
-                if(ret != sendOut.length) {  
-                    Log.e(TAG, " Send success!!!");
-                } else {
-                    Log.e(TAG, " Send failed!!!");
-                }
+            if(hidBridge!=null) {
+                
+                hidBridge.StartReadingThread();
+                hidBridge.WriteData(sendOut);
             }
         }
+    }
+    Handler handler = new Handler(){
+        @Override
+        public void handleMessage(Message msg) {
+          mStringBuffer_Console_Text.append(msg.obj);
+          mTextView_ShowConsole.setText(mStringBuffer_Console_Text);
+            super.handleMessage(msg);
+        }
+    };
+    void log(String messageString){
+        handler.obtainMessage(0, messageString).sendToTarget();
     }
 
     private int mLastValue = 0;
