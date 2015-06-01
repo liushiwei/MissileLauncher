@@ -53,13 +53,14 @@ public class MissileLauncherActivity extends Activity
 
     private Button mFire;
     private Button mShoot;
+    private Button mStop;
     private UsbManager mUsbManager;
     private UsbDevice mDevice;
     private UsbDeviceConnection mConnection;
     private UsbEndpoint mEndpointIntr;
     private SensorManager mSensorManager;
     private Sensor mGravitySensor;
-    
+
     UsbDevice deviceFound = null;
     UsbInterface usbInterfaceFound = null;
     UsbEndpoint endpointIn = null;
@@ -80,7 +81,7 @@ public class MissileLauncherActivity extends Activity
     private static final int TILT_UP = 4;
     private static final int TILT_DOWN = 8;
     private static final double THRESHOLD = 5.0;
-    
+
     private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
     PendingIntent mPermissionIntent;
 
@@ -89,26 +90,28 @@ public class MissileLauncherActivity extends Activity
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.launcher);
-        mFire = (Button)findViewById(R.id.fire);
+        mFire = (Button) findViewById(R.id.fire);
         mFire.setOnClickListener(this);
-        mShoot = (Button)findViewById(R.id.shoot);
+        mShoot = (Button) findViewById(R.id.shoot);
         mShoot.setOnClickListener(this);
-        mUsbManager = (UsbManager)getSystemService(Context.USB_SERVICE);
+        mStop = (Button) findViewById(R.id.stop);
+        mStop.setOnClickListener(this);
+        mUsbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
 
-        mSensorManager = (SensorManager)getSystemService(Context.SENSOR_SERVICE);
+        mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         mGravitySensor = mSensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY);
         mPermissionIntent = PendingIntent.getBroadcast(this, 0, new Intent(
                 ACTION_USB_PERMISSION), 0);
         IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
         registerReceiver(mUsbReceiver, filter);
-        
+
         registerReceiver(mUsbDeviceReceiver, new IntentFilter(
                 UsbManager.ACTION_USB_DEVICE_ATTACHED));
         registerReceiver(mUsbDeviceReceiver, new IntentFilter(
                 UsbManager.ACTION_USB_DEVICE_DETACHED));
         mTextView_ShowConsole = (TextView) findViewById(R.id.ShowConsole);
     }
-    
+
     private final BroadcastReceiver mUsbDeviceReceiver = new BroadcastReceiver() {
 
         @Override
@@ -139,11 +142,11 @@ public class MissileLauncherActivity extends Activity
                     if (device == deviceFound) {
                         releaseUsb();
                     } else {
-                        Toast.makeText(MissileLauncherActivity.this,
-                                "device == deviceFound, no call releaseUsb()\n" +
-                                        device.toString() + "\n" +
-                                        deviceFound.toString(),
-                                Toast.LENGTH_LONG).show();
+//                        Toast.makeText(MissileLauncherActivity.this,
+//                                "device == deviceFound, no call releaseUsb()\n" +
+//                                        device.toString() + "\n" +
+//                                        deviceFound.toString(),
+//                                Toast.LENGTH_LONG).show();
                     }
                 } else {
                     Toast.makeText(MissileLauncherActivity.this,
@@ -154,7 +157,7 @@ public class MissileLauncherActivity extends Activity
         }
 
     };
-    
+
     private final BroadcastReceiver mUsbReceiver = new BroadcastReceiver() {
 
         @Override
@@ -200,10 +203,7 @@ public class MissileLauncherActivity extends Activity
             mConnection = null;
         }
 
-        
     }
-    
-    
 
     @Override
     public void onResume() {
@@ -215,9 +215,9 @@ public class MissileLauncherActivity extends Activity
         Log.d(TAG, "intent: " + intent);
         String action = intent.getAction();
 
-        UsbDevice device = (UsbDevice)intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+        UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
         if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)) {
-            //setDevice(device);
+            // setDevice(device);
             searchEndPoint();
         } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
             if (mDevice != null && mDevice.equals(device)) {
@@ -229,9 +229,11 @@ public class MissileLauncherActivity extends Activity
     @Override
     public void onDestroy() {
         super.onDestroy();
+        unregisterReceiver(mUsbReceiver);
+        unregisterReceiver(mUsbDeviceReceiver);
         releaseUsb();
     }
-    
+
     private void searchEndPoint() {
 
         usbInterfaceFound = null;
@@ -271,28 +273,31 @@ public class MissileLauncherActivity extends Activity
             // and direction USB_DIR_OUT and USB_DIR_IN
 
             for (int i = 0; i < deviceFound.getInterfaceCount(); i++) {
-                Log.e(TAG, " interface ["+i+"]" +" ");
+                Log.e(TAG, " interface [" + i + "]" + " ");
                 UsbInterface usbif = deviceFound.getInterface(i);
                 UsbEndpoint tOut = null;
                 UsbEndpoint tIn = null;
                 int tEndpointCnt = usbif.getEndpointCount();
-                Log.e(TAG, " interface ["+i+"]" +" EndpointCount = "+tEndpointCnt);
+                Log.e(TAG, " interface [" + i + "]" + " EndpointCount = " + tEndpointCnt);
                 if (tEndpointCnt > 0) {
                     for (int j = 0; j < tEndpointCnt; j++) {
-                        Log.e(TAG, "Endpoint ["+j+"]"+" Type ="+usbif.getEndpoint(j).getType());
-                        Log.e(TAG, "Endpoint ["+j+"]"+" Direction = "+usbif.getEndpoint(j).getDirection());
-                        Log.e(TAG, "Endpoint ["+j+"]"+" Address = "+usbif.getEndpoint(j).getAddress());
+                        Log.e(TAG, "Endpoint [" + j + "]" + " Type ="
+                                + usbif.getEndpoint(j).getType());
+                        Log.e(TAG, "Endpoint [" + j + "]" + " Direction = "
+                                + usbif.getEndpoint(j).getDirection());
+                        Log.e(TAG, "Endpoint [" + j + "]" + " Address = "
+                                + usbif.getEndpoint(j).getAddress());
                         if (usbif.getEndpoint(j).getAddress() == 0x81) {
                             endpointOut = usbif.getEndpoint(j);
                             usbInterfaceFound = usbif;
-                        }else if (usbif.getEndpoint(j).getAddress() == 0x1){
+                        } else if (usbif.getEndpoint(j).getAddress() == 0x1) {
                             endpointIn = usbif.getEndpoint(j);
                         }
                     }
                 }
 
             }
-            if(endpointOut!=null&&usbInterfaceFound!=null) {
+            if (endpointOut != null && usbInterfaceFound != null) {
                 UsbDeviceConnection connection = mUsbManager.openDevice(deviceFound);
                 if (connection != null && connection.claimInterface(usbInterfaceFound, true)) {
                     Log.d(TAG, "open SUCCESS");
@@ -337,7 +342,7 @@ public class MissileLauncherActivity extends Activity
                 Log.d(TAG, "open FAIL");
                 mConnection = null;
             }
-         }
+        }
     }
 
     private void sendCommand(int control) {
@@ -347,41 +352,50 @@ public class MissileLauncherActivity extends Activity
             }
             if (mConnection != null) {
                 byte[] message = new byte[1];
-                message[0] = (byte)control;
+                message[0] = (byte) control;
                 // Send command via a control request on endpoint zero
                 mConnection.controlTransfer(0x21, 0x9, 0x200, 0, message, message.length, 0);
             }
         }
     }
-   private HidBridge hidBridge; 
-   public StringBuffer mStringBuffer_Console_Text = new StringBuffer("Show Info:\n");
-   public TextView mTextView_ShowConsole;
+
+    private HidBridge hidBridge;
+    public StringBuffer mStringBuffer_Console_Text = new StringBuffer("Show Info:\n");
+    public TextView mTextView_ShowConsole;
+
     public void onClick(View v) {
         if (v == mFire) {
-            //sendCommand(COMMAND_FIRE);
-            if(hidBridge==null){
-                hidBridge = new HidBridge(this,22336, 1155);
+            // sendCommand(COMMAND_FIRE);
+            if (hidBridge == null) {
+                hidBridge = new HidBridge(this, 22336, 1155);
                 hidBridge.OpenDevice();
+                hidBridge.StartReadingThread();
             }
         }
         byte[] sendOut = "Hello World!!!".getBytes();
-        if(v == mShoot) {
-            if(hidBridge!=null) {
-                
-                hidBridge.StartReadingThread();
+        if (v == mShoot) {
+            if (hidBridge != null) {
                 hidBridge.WriteData(sendOut);
             }
         }
+        if (v == mStop) {
+            if (hidBridge != null) {
+
+                hidBridge.StopReadingThread();
+            }
+        }
     }
-    Handler handler = new Handler(){
+
+    Handler handler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
-          mStringBuffer_Console_Text.append(msg.obj);
-          mTextView_ShowConsole.setText(mStringBuffer_Console_Text);
+            mStringBuffer_Console_Text.append(msg.obj);
+            mTextView_ShowConsole.setText(mStringBuffer_Console_Text);
             super.handleMessage(msg);
         }
     };
-    void log(String messageString){
+
+    void log(String messageString) {
         handler.obtainMessage(0, messageString).sendToTarget();
     }
 
@@ -411,7 +425,7 @@ public class MissileLauncherActivity extends Activity
                         sendCommand(COMMAND_LEFT);
                         break;
                     case TILT_RIGHT:
-                       sendCommand(COMMAND_RIGHT);
+                        sendCommand(COMMAND_RIGHT);
                         break;
                     case TILT_UP:
                         sendCommand(COMMAND_UP);
@@ -464,5 +478,3 @@ public class MissileLauncherActivity extends Activity
         }
     }
 }
-
-
